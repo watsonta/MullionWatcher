@@ -16,8 +16,13 @@
  */
 package net.watsonplace.twitter;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.IOException;
 import java.text.DateFormat;
 import java.util.Date;
+import java.util.Properties;
 
 import org.apache.log4j.Logger;
 
@@ -28,14 +33,14 @@ import twitter4j.auth.AccessToken;
 
 public class Agent {
 	private static final Logger logger = Logger.getLogger(Agent.class.getName());
-	
-	// @BPMullions
-	private static String CONSUMER_KEY = "PqHFEjJnItyUEFB88TsKfkgQD";
-	private static String CONSUMER_SECRET = "uEhznUdiVKVvkFepjRiqJONt8r4XfCa5M9hlb8cuS4LAE1dGLV";
-	private static String TOKEN = "2964796963-di54MTj9Oq1YkMsqBfEno6cObZftaDu93gefWJZ";
-	private static String TOKEN_SECRET = "ADmSqSWPQl9QHmjcjNN5ryt9SYgO6trnnu5AVgxcTFAPw";
-
+	private static String TWITTER_PROPERTIES_FILE = "conf/twitter.properties";
 	private static Agent singleton = null;
+
+	private String consumerKey;
+	private String consumerSecret;
+	private String token;
+	private String presharedKey;
+	private Properties twitterProperties = new Properties();
 	
 	public static Agent getInstance() {
 		if (singleton == null) {
@@ -47,24 +52,65 @@ public class Agent {
 	private Twitter twitter = null;
 
 	private Agent() {
+		// Load twitter authentication properties
+		try {
+			twitterProperties.load(new FileReader(new File(TWITTER_PROPERTIES_FILE)));
+			consumerKey = twitterProperties.getProperty("twitter.consumer.key");
+			consumerSecret = twitterProperties.getProperty("twitter.consumer.secret");
+			token = twitterProperties.getProperty("twitter.access.token");
+			presharedKey = twitterProperties.getProperty("twitter.access.token.secret");
+		} catch (FileNotFoundException e) {
+			logger.fatal("twitter.properties file not found");
+			System.exit(1);
+		} catch (IOException e) {
+			logger.fatal("Unable to read twitter properties");
+			System.exit(1);
+		};
+		
+		// Authenticate with Twitter
 		twitter = TwitterFactory.getSingleton();
+		String user = null;
+		try {
+			user = authenticate();
+		} catch (IllegalStateException | TwitterException e) {
+			logger.fatal("Twitter authentication failed: "+e.getMessage());
+			System.exit(1);
+		}
+	    logger.info("Authenticated to Twitter as "+user);
+	}
+	
+	/*
+	 * Authenticate
+	 * @returns Twitter User ID
+	 */
+	public String authenticate() throws IllegalStateException, TwitterException {
+	    twitter.setOAuthConsumer(consumerKey, consumerSecret);
+	    AccessToken accessToken = new AccessToken(token, presharedKey);
+	    twitter.setOAuthAccessToken(accessToken);
+	    return twitter.getScreenName();
 	}
 
+	/*
+	 * Update Twitter status
+	 * @param tweetBody - The text to be tweeted
+	 * @param appendTimestamp - Whether to add a timestamp to the tweet
+	 * @returns - Whether or not the tweet was successful
+	 */
 	public synchronized boolean updateStatus(String tweetBody, boolean appendTimestamp) {
 		StringBuffer tweet = new StringBuffer("#MullionWatcher "+tweetBody);
+
+		// Add a timestamp so that Twitter won't filter as identical tweet
 		if (appendTimestamp) {
 			DateFormat df = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT);
 			tweet.append(" ("+df.format(new Date(System.currentTimeMillis())+")"));
 		}
-		
+
+		// Tweet
 		logger.info("Tweeting: #MullionWatcher "+tweetBody);
 		try {
-		    twitter.setOAuthConsumer(CONSUMER_KEY, CONSUMER_SECRET);
-		    AccessToken accessToken = new AccessToken(TOKEN, TOKEN_SECRET);
-		    twitter.setOAuthAccessToken(accessToken);
 			twitter.updateStatus(tweet.toString());
 		} catch (TwitterException e) {
-			logger.error("Couldn't tweet!");
+			logger.error("Couldn't tweet: "+e.getMessage());
 			return false;
 		}
 		return true;
