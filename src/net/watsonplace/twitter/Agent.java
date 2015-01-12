@@ -1,3 +1,19 @@
+/**
+ * This file is part of MullionWatcher.
+ *
+ * MullionWatcher is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+
+ * MullionWatcher is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+
+ * You should have received a copy of the GNU General Public License
+ * along with MullionWatcher.  If not, see <http://www.gnu.org/licenses/>.
+ */
 package net.watsonplace.twitter;
 
 import java.text.DateFormat;
@@ -12,12 +28,6 @@ import twitter4j.auth.AccessToken;
 
 public class Agent {
 	private static final Logger logger = Logger.getLogger(Agent.class.getName());
-
-	// @watsonta
-//	private static String CONSUMER_KEY = "UkJPmqr2hyAADC7V6zcQZNZg9";
-//	private static String CONSUMER_SECRET = "YNB26mD3EvJejl22h4EkAt9x93m8vvrNAaWxyiVjlWVti6etnY";
-//	private static String TOKEN = "14904211-FyQ3LV1AaZ9HZauGHUavaYRzWypuxhBvDSf8ivCdH";
-//	private static String TOKEN_SECRET = "m1RLDBBHAltwW8yr6nD4iZuzB743R7JXZ8dxfqMZOyaUT";
 	
 	// @BPMullions
 	private static String CONSUMER_KEY = "PqHFEjJnItyUEFB88TsKfkgQD";
