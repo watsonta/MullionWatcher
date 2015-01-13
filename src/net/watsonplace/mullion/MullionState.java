@@ -65,7 +65,7 @@ public class MullionState {
 			// Missing sensor?
 			if (ts.getTimestamp() < System.currentTimeMillis()-5*ONE_MINUTE) {
 				logger.info("Lost sensor "+ts.getSensorName());
-				sensorState.remove(ts.getSensorName());
+				i.remove();
 				continue;
 			}
 			lowest = (lowest == null || ts.getTemperature() < lowest.getTemperature()) ? ts : lowest;

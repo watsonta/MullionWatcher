@@ -60,6 +60,14 @@ public class Sender extends Thread {
 	      clientSocket.close();
 	}
 	
+	/*
+	 * (non-Javadoc)
+	 * @see java.lang.Thread#run()
+	 * 
+	 * This thread listens to stdin for lines piped from the command: "hcidump -R -l 62"
+	 * 
+	 * Note: The command "hcitool lescan" must also be running to produce packet flow
+	 */
 	public void run() {
 		String line;
 		Vector<String> v = new Vector<String>();
