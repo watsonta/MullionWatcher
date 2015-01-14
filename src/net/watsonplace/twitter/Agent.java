@@ -102,7 +102,7 @@ public class Agent {
 		// Add a timestamp so that Twitter won't filter as identical tweet
 		if (appendTimestamp) {
 			DateFormat df = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT);
-			tweet.append(" ("+df.format(new Date(System.currentTimeMillis())+")"));
+			tweet.append(" ("+df.format(new Date(System.currentTimeMillis()))+")");
 		}
 
 		// Tweet
@@ -114,6 +114,11 @@ public class Agent {
 			return false;
 		}
 		return true;
+	}
+	
+	public static void main(String[] args) {
+		Agent a = Agent.getInstance();
+		a.updateStatus("Test tweet", true);
 	}
 	
 }
