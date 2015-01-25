@@ -1,13 +1,14 @@
-<project name="MullionWatcher" default="dist" basedir=".">
-
+<project name="MullionWatcher" default="jar" basedir="." xmlns:ivy="antlib:org.apache.ivy.ant">
+	<property name="revision" value="0.1" />
+	
 	<!-- set global properties for this build -->
 	<property name="src" location="src"/>
 	<property name="build" location="build"/>
 	<property name="dist"  location="dist"/>
 
+	<taskdef resource="org/apache/ivy/ant/antlib.xml" uri="antlib:org.apache.ivy.ant" />
+	
 	<target name="init">
-		<!-- Create the time stamp -->
-		<tstamp />
 		<!-- Create the build directory structure used by compile -->
 		<mkdir dir="${build}" />
 
@@ -21,6 +22,11 @@
 	    <echo message="classpath = ${classpathProp}"/>
 	</target>
 
+	<target name="resolve">
+        <ivy:resolve file="ivy.xml" conf="MullionWatcher" transitive="false"  type="jar"/>
+        <ivy:retrieve />
+    </target>
+	
 	<target name="compile" depends="init" description="compile the source ">
 		<!-- Compile the java code from ${src} into ${build} -->
 		<javac srcdir="${src}" destdir="${build}">
@@ -28,14 +34,17 @@
 		</javac>
 	</target>
 
-	<target name="dist" depends="compile" description="generate the distribution" >
+	<target name="jar" depends="compile" description="generate the distribution" >
 		<!-- Create the distribution directory -->
 		<mkdir dir="${dist}/lib"/>
-
-		<!-- Put everything in ${build} into the MullionWatcher-${DSTAMP}.jar file -->
-		<jar jarfile="${dist}/lib/MullionWatcher.jar" basedir="${build}"/>
+		<!-- Put everything in ${build} into the MullionWatcher-${revision}.jar file -->
+		<jar jarfile="${dist}/lib/MullionWatcher-${revision}.jar" basedir="${build}"/>
 	</target>
 
+	<target name="clean-cache">
+	        <ivy:cleancache />
+    </target> 
+		
 	<target name="clean" description="clean up" >
 		<!-- Delete the ${build} and ${dist} directory trees -->
 		<delete dir="${build}"/>

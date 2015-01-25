@@ -33,7 +33,7 @@ import twitter4j.auth.AccessToken;
 
 public class Agent {
 	private static final Logger logger = Logger.getLogger(Agent.class.getName());
-	private static String TWITTER_PROPERTIES_FILE = "conf/twitter.properties";
+	private static final String TWITTER_PROPERTIES_FILE = "conf/twitter.properties";
 	private static Agent singleton = null;
 
 	private String consumerKey;
@@ -60,10 +60,10 @@ public class Agent {
 			token = twitterProperties.getProperty("twitter.access.token");
 			presharedKey = twitterProperties.getProperty("twitter.access.token.secret");
 		} catch (FileNotFoundException e) {
-			logger.fatal("twitter.properties file not found");
+			logger.fatal(TWITTER_PROPERTIES_FILE+" file not found");
 			System.exit(1);
 		} catch (IOException e) {
-			logger.fatal("Unable to read twitter properties");
+			logger.fatal("Unable to read Twitter properties");
 			System.exit(1);
 		};
 		

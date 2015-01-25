@@ -14,15 +14,15 @@
  * You should have received a copy of the GNU General Public License
  * along with MullionWatcher.  If not, see <http://www.gnu.org/licenses/>.
  */
-package net.watsonplace.ecobee;
+package net.watsonplace.climate;
 
 public class Dewpoint {
 	
-	public static int calculate(int temperatureF, int relativeHumidityPct) {
-		float t = (temperatureF - 32) * -5f / 9;
+	public static float calculate(float temperatureF, int relativeHumidityPct) {
+		float t = (temperatureF - 32) * -5 / 9;
 	    float rh = relativeHumidityPct / 100f;
 	    double eln = Math.log(rh * Math.exp(-17.67 * t / (243.5 - t)));
-	    return (int)Math.round(32 + (-243.5 * eln / (eln - 17.67)) * 9 / 5);
+	    return Math.round(32 + (-243.5 * eln / (eln - 17.67)) * 9 / 5);
 	}
 	
 }

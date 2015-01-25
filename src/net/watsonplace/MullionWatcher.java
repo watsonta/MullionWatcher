@@ -21,9 +21,12 @@ import java.text.DateFormat;
 import java.util.Calendar;
 import java.util.Date;
 
-import net.watsonplace.mullion.Sender;
+import net.watsonplace.climate.ClimateControl;
+import net.watsonplace.climate.Dewpoint;
+import net.watsonplace.climate.ecobee.Control;
 import net.watsonplace.mullion.MullionState;
 import net.watsonplace.mullion.Receiver;
+import net.watsonplace.mullion.Sender;
 import net.watsonplace.mullion.TemperatureSample;
 import net.watsonplace.twitter.Agent;
 
@@ -36,18 +39,19 @@ public class MullionWatcher {
 	private static final long ONE_HOUR = 60*ONE_MINUTE;
 	private static final String RECEIVER_HOST = "localhost";
 	private static final int RECEIVER_PORT = 9876;
+	private static final float TWEET_SPREAD = 5.0f;
+	private static final float ALARM_SPREAD = 2.0f;
+	
+	private ClimateControl climateControl;
 
 	/*
-	 * Final design:
+	 * 
 	 * Get mullion temperature (T)
 	 * Get dewpoint (DP) from Ecobee
 	 * Compare
 	 * If T <= (DP+5), tweet warning
 	 * If T <= (DP+2), tweet alarm
 	 * 
-	 * Interim design:
-	 * Get mullion temperature (T)
-	 * If T <= 55F, tweet alarm
 	 */
 	public void run() {
 		long lastReadingAlarm = System.currentTimeMillis();
@@ -86,28 +90,35 @@ public class MullionWatcher {
 			// Update lowest temperature
 			low = (low == null || state.getTemperature() < low.getTemperature()) ? state : low;
 
-			// Log temp hourly
+			// Get indoor dew point
+			float dewPoint = Dewpoint.calculate(climateControl.getTemperature(), climateControl.getHumidity());
+
+			// Log climate hourly
 			if (lastHourlyLog < now-ONE_HOUR) {
 				logger.info("Mullion temperature is "+state.getTemperature());
+				logger.info("Dew point is "+dewPoint);
 				lastHourlyLog = now;
 				continue;
 			}
-				
+			
 			// Alarm when nearing dew point
-			if (state.getTemperature() < 51f) {
+			float spread = state.getTemperature()-dewPoint;
+			if (spread < ALARM_SPREAD) {
 				if (lastAlarmTweet < now-ONE_HOUR) {
-					twitterAgent.updateStatus("ALARM: mullions at "+state.getTemperature(), true);
+					twitterAgent.updateStatus("CONDENSATION ALARM: mullions at "+state.getTemperature()
+						+" (spread="+spread+")", true);
 					lastAlarmTweet = now;
 				}
 				continue;
 			}
 
-			// When it's at or below 55F
-			if (state.getTemperature() <= 55f) {
+			// Warn when spread < 5 degrees
+			if (spread <= TWEET_SPREAD) {
 				
 				// Tweet temp hourly
 				if (lastHourlyTweet < now-ONE_HOUR) {
-					twitterAgent.updateStatus("Mullion temperature is "+state.getTemperature(), true);
+					twitterAgent.updateStatus("CONDENSATION WATCH: mullions at "+state.getTemperature()
+						+" (spread="+spread+")", true);
 					lastHourlyTweet = now;
 					continue;
 				}
@@ -127,6 +138,8 @@ public class MullionWatcher {
 
 	public static void main(String[] args) {
 		logger.info("Starting up");
+		
+		MullionWatcher mw = new MullionWatcher();
 		
 		// Start mullion Receiver thread
 		logger.debug("Starting Receiver thread");
@@ -153,12 +166,18 @@ public class MullionWatcher {
 		}
 		
 		// Start Ecobee climate thread
+		try {
+			Control ecobeeControl = Control.getInstance();
+			ecobeeControl.setDaemon(true);
+			ecobeeControl.start();
+			mw.climateControl = ecobeeControl;
+		} catch (Exception e) {
+			logger.fatal("Unable to start Ecobee climate control thread", e);
+			return;
+		}
 		
 		// Main loop
-		MullionWatcher mw = new MullionWatcher();
-		logger.debug("Starting MullionWatcher run() method");
 		mw.run();
-
 		logger.info("Shutting down");
 		System.exit(0);
 	}
