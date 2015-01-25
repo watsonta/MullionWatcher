@@ -1,0 +1,4 @@
+twitter.consumer.key=<Put your consumer key here>
+twitter.consumer.secret=<Put your consumer secret here>
+twitter.access.token=<Put your access token here>
+twitter.access.token.secret=<Put your access token secret here>
