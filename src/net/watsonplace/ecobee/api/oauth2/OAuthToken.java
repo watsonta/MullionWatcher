@@ -150,8 +150,8 @@ public class OAuthToken {
 		} finally {
 			// Close the input stream
 			try {
-				reader.close();
-				content.close();
+				if (reader != null) reader.close();
+				if (content != null) content.close();
 			} catch (IOException e) {
 				logger.error("Unable to close content InputStream", e);
 			}
@@ -195,23 +195,4 @@ public class OAuthToken {
 		}
 	}
 	
-	public static void main(String[] args) {
-		OAuthToken t = new OAuthToken("ThisIsTheAccessToken", "ThisIsTheRefreshToken");
-		try {
-			t.save();
-			logger.info("Token saved");
-			System.out.println(t.toString());
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		try {
-			t.load();
-			logger.info("Token loaded");
-			System.out.println(t.toString());
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		
-	}
-
 }

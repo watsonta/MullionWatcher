@@ -1,6 +1,15 @@
 package net.watsonplace.ecobee.api;
 
-public class Thermostat {
+import java.lang.reflect.Type;
+
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.reflect.TypeToken;
+
+public class Thermostat extends APIObject {
+	public static String[] APIObjectIdentifier = new String[]{ "thermostat", "thermostatList" };
+	public static Type APIObjectType = new TypeToken<Thermostat>(){}.getType();
+	
 	private String identifier; // The unique thermostat serial number.
 	private String name; // A user defined name for a thermostat.
 	private String thermostatRev; // The current thermostat configuration revision.
@@ -30,6 +39,10 @@ public class Thermostat {
 	private Version version;
 	private SecuritySettings securitySettings;
 	
+	public Thermostat() {
+		this.isRegistered = true;
+	}
+	
 	public String getName() {
 		return name;
 	}
@@ -37,4 +50,19 @@ public class Thermostat {
 	public Runtime getRuntime() {
 		return runtime;
 	}
+	
+	public Weather getWeather() {
+		return weather;
+	}
+	
+	@Override
+	public String[] getAPIObjectIdentifier() {
+		return APIObjectIdentifier;
+	}
+
+	@Override
+	public String toJson() {
+		return super.toJson(APIObjectIdentifier[0]);
+	}
+	
 }

@@ -5,7 +5,6 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 
-import net.watsonplace.ecobee.api.PIN;
 import net.watsonplace.ecobee.api.Status;
 
 import org.apache.http.HttpEntity;
@@ -136,7 +135,7 @@ public class RegistrationClient {
 		OAuthToken token = null;
 		
 		if (args.length == 0 || args[0].length() == 0) {
-			System.out.print("Missing API Key argument");
+			System.out.println("Missing API Key argument");
 			System.exit(0);
 		}
 		

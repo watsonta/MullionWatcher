@@ -22,6 +22,7 @@ public class Control extends Thread implements ClimateControl {
 	}
 	
 	private API api;
+	private Set<Thermostat> thermostats;
 	private float temperature = Float.MAX_VALUE;
 	private int humidity = 50;
 	private long timestamp = 0;
@@ -33,7 +34,7 @@ public class Control extends Thread implements ClimateControl {
 	public void run() {
 		while (true) {
 			try {
-				Set<Thermostat> thermostats = api.getThermostats();
+				thermostats = api.getThermostats();
 				float temperature = Float.MIN_VALUE;
 				int humidity = 0;
 				for (Thermostat thermostat : thermostats) {
@@ -54,61 +55,52 @@ public class Control extends Thread implements ClimateControl {
 				} else {
 					logger.error("Humidity fetch failed");
 				}
-				Thread.sleep(15*60*1000); // 15 minutes
 			} catch (Exception e) {
 				logger.error("Unable to fetch Ecobee temperature and humidity", e);
+			} finally {
+				try {
+					Thread.sleep(15*60*1000); // Sleep for 15 minutes
+				} catch (InterruptedException e) {}
 			}
 		}
+	}
+
+	@Override
+	public Set<Thermostat> getThermostats() {
+		return thermostats;
 	}
 
 	// Returns lowest temperature among all thermostats
 	@Override
-	public float getTemperature() {
+	public float getLowestTemperature() {
 		return temperature;
 	}
 
 	@Override
-	public void setTemperature() throws Exception {
-	}
-
-	@Override
-	public int getHumidity() {
+	public int getHighestHumidity() {
 		return humidity;
 	}
 	
 	@Override
-	public long getTimestamp() {
+	public long getSampleTimestamp() {
 		return timestamp;
 	}
-	
-	public static void main(String[] args) {
-		Control c = null;
-		try {
-			c = Control.getInstance();
-			c.setDaemon(true);
-			c.start();
-		} catch (Exception e) {
-			logger.fatal("Unable to instantiate Control object", e);
-			System.exit(1);
-		}
 
-		while (true) {
-			try {
-				float temperature = c.getTemperature();
-				int humidity = c.getHumidity();
-				long timestamp = c.getTimestamp();
-				logger.info("timestamp="+timestamp+", temperature="+temperature+", humidity="+humidity);
-			} catch (Exception e) {
-				logger.error(e.getMessage());
-				e.printStackTrace();
-				System.exit(1);
-			}
-			
-			// Wait 30 minutes
-			try {
-				Thread.sleep(10*1000);
-			} catch (InterruptedException e) {}
-		}
+	@Override
+	public float getCoolingSetPoint(Thermostat thermostat) {
+		Runtime runtime = thermostat.getRuntime();
+		return runtime.getDesiredCool()/10.0f;
+	}
+
+	@Override
+	public float getHeatingSetPoint(Thermostat thermostat) {
+		Runtime runtime = thermostat.getRuntime();
+		return runtime.getDesiredHeat()/10.0f;
+	}
+	
+	@Override
+	public void setHold(int desiredHeatTemp, int desiredColdTemp, int hours) throws Exception {
+		api.setHold(desiredHeatTemp, desiredColdTemp, hours);
 	}
 
 }

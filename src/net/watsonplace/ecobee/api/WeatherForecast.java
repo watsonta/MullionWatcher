@@ -1,8 +1,16 @@
 package net.watsonplace.ecobee.api;
 
+import java.lang.reflect.Type;
 import java.util.HashMap;
 
-public class WeatherForecast {
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.reflect.TypeToken;
+
+public class WeatherForecast extends APIObject {
+	public static String[] APIObjectIdentifier = new String[] { "weatherforecast" };
+	public static Type APIObjectType = new TypeToken<WeatherForecast>(){}.getType();
+	
 	HashMap<Integer, String> symbolMappings = new HashMap<Integer, String>();
 	
 	public WeatherForecast() {
@@ -47,4 +55,23 @@ public class WeatherForecast {
 	Integer tempHigh; // The predicted high temperature for the day.
 	Integer tempLow; // The predicted low temperature for the day.
 	Integer sky; // The cloud cover condition.
+	
+	public int getTemperature() {
+		return temperature;
+	}
+	
+	public int getHumidity() {
+		return relativeHumidity;
+	}
+	
+	@Override
+	public String[] getAPIObjectIdentifier() {
+		return APIObjectIdentifier;
+	}
+
+	@Override
+	public String toJson() {
+		return super.toJson(APIObjectIdentifier[0]);
+	}
+	
 }

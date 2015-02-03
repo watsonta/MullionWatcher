@@ -1,6 +1,15 @@
 package net.watsonplace.ecobee.api;
 
-public class Runtime {
+import java.lang.reflect.Type;
+
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.reflect.TypeToken;
+
+public class Runtime extends APIObject {
+	public static String[] APIObjectIdentifier = new String[] { "runtime" };
+	public static Type APIObjectType = new TypeToken<Runtime>(){}.getType();
+	
 	private String runtimeRev; // The current runtime revision. Equivalent in meaning to the runtime revision number in the thermostat summary call.
 	private Boolean connected; // Whether the thermostat is currently connected to the server.
 	private String firstConnected; // The UTC date/time stamp of when the thermostat first connected to the ecobee server.	
@@ -26,7 +35,30 @@ public class Runtime {
 		return actualTemperature/10.0f;
 	}
 	
+	public void setTemperature(float desiredHeat) {
+		this.desiredHeat = (int)desiredHeat*10;
+	}
+	
 	public int getHumidity() {
 		return actualHumidity;
 	}
+
+	public Integer getDesiredHeat() {
+		return Math.round(desiredHeat/10f);
+	}
+
+	public Integer getDesiredCool() {
+		return Math.round(desiredCool/10f);
+	}
+
+	@Override
+	public String[] getAPIObjectIdentifier() {
+		return APIObjectIdentifier;
+	}
+
+	@Override
+	public String toJson() {
+		return super.toJson(APIObjectIdentifier[0]);
+	}
+	
 }

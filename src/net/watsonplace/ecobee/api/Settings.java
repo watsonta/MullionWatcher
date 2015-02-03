@@ -1,6 +1,15 @@
 package net.watsonplace.ecobee.api;
 
-public class Settings {
+import java.lang.reflect.Type;
+
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.reflect.TypeToken;
+
+public class Settings extends APIObject {
+	public static String[] APIObjectIdentifier = new String[] { "settings" };
+	public static Type APIObjectType = new TypeToken<Settings>(){}.getType();
+	
 	String hvacMode; //The current HVAC mode the thermostat is in. Values: auto, auxHeatOnly, cool, heat, off.
 	String lastServiceDate; //The last service date of the HVAC equipment.	
 	Boolean serviceRemindMe; //Whether to send an alert when service is required again.
@@ -114,4 +123,15 @@ public class Settings {
 	String groupRef; // The unique reference to the group this thermostat belongs to, if any. See GET Group request and POST Group request for more information.
 	String groupName; // The name of the the group this thermostat belongs to, if any. See GET Group request and POST Group request for more information.
 	Integer groupSetting; // The setting value for the group this thermostat belongs to, if any. See GET Group request and POST Group request for more information. 
+	
+	@Override
+	public String[] getAPIObjectIdentifier() {
+		return APIObjectIdentifier;
+	}
+
+	@Override
+	public String toJson() {
+		return super.toJson(APIObjectIdentifier[0]);
+	}
+	
 }

@@ -1,4 +1,4 @@
-package net.watsonplace.ecobee.api;
+package net.watsonplace.ecobee.api.oauth2;
 
 /**
  * Represents an Ecobee PIN.

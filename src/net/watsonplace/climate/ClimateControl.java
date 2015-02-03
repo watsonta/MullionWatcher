@@ -1,12 +1,23 @@
 package net.watsonplace.climate;
 
-public interface ClimateControl {
+import java.util.Set;
 
-	public float getTemperature();
+import net.watsonplace.ecobee.api.Thermostat;
+
+public interface ClimateControl {
 	
-	public void setTemperature() throws Exception;
+	public Set<Thermostat> getThermostats();
+
+	public float getLowestTemperature();
 	
-	public int getHumidity();
+	public void setHold(int desiredHeatTemp, int desiredColdTemp, int hours) throws Exception;
 	
-	public long getTimestamp();
+	public int getHighestHumidity();
+	
+	public long getSampleTimestamp();
+	
+	public float getCoolingSetPoint(Thermostat thermostat);
+	
+	public float getHeatingSetPoint(Thermostat thermostat);
+	
 }

@@ -9,6 +9,7 @@ import org.apache.log4j.Logger;
 
 public class OAuthDetails {
 	private static final Logger logger = Logger.getLogger(OAuthDetails.class.getName());
+	
 	private static final String OAUTH_PROPERTIES_FILE = "conf/ecobee.properties";
 	private static final String AUTH_SERVER = "https://api.ecobee.com/token";
 	private static final String RESOURCE_SERVER = "https://api.ecobee.com/1";
