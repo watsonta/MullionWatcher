@@ -57,7 +57,7 @@ public class MullionState {
 	}
 
 	// Return sample with the lowest temperature
-	public synchronized TemperatureSample getLowestTemperature() {
+	public synchronized TemperatureSample getTemperature() {
 		Iterator<TemperatureSample> i = sensorState.values().iterator();
 		TemperatureSample lowest = null;
 		while (i.hasNext()) {

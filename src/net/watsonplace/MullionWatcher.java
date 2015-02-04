@@ -27,10 +27,10 @@ import java.util.Properties;
 import java.util.Set;
 
 import net.watsonplace.climate.ClimateControl;
-import net.watsonplace.climate.Dewpoint;
+import net.watsonplace.climate.Thermostat;
+import net.watsonplace.climate.Weather;
 import net.watsonplace.climate.ecobee.Control;
-import net.watsonplace.ecobee.api.Thermostat;
-import net.watsonplace.ecobee.api.WeatherForecast;
+import net.watsonplace.climate.util.Dewpoint;
 import net.watsonplace.mullion.MullionState;
 import net.watsonplace.mullion.Receiver;
 import net.watsonplace.mullion.Sender;
@@ -66,67 +66,71 @@ public class MullionWatcher {
 		long lastDailyLowTweet = System.currentTimeMillis();
 		long lastAction = 0;
 		
-		TemperatureSample low = null;
+		TemperatureSample mullionDailyLow = null;
 		
+		// Set up a number formatter with 1 fractional digit
+		NumberFormat nf = NumberFormat.getNumberInstance();
+		nf.setMinimumFractionDigits(1);
+		nf.setMaximumFractionDigits(1);
+		
+		// Get the MullionState instance
 		MullionState mullionState = MullionState.getInstance();
+		
+		// Get the TwitterAgent instance
 		Agent twitterAgent = Agent.getInstance();
 		
+		// Get a calendar instance for no reason other than so that we can know when it's 8am
 		Calendar cal = Calendar.getInstance();
+		
 		while (!shutdown) {
 			// Get current time
 			long now = System.currentTimeMillis();
 			cal.setTimeInMillis(now);
-			
+
+			// Let's check things every minute
 			try {
 				Thread.sleep(ONE_MINUTE);
 			} catch (InterruptedException e) {}
 			
-			// Get mullion state
-			TemperatureSample state = mullionState.getLowestTemperature();
-			
-			// Warn if no readings
+			// Get current mullion temperature
+			TemperatureSample state = mullionState.getTemperature();
 			if (state == null) {
 				if (lastReadingAlarm < now-ONE_HOUR) {
-					twitterAgent.updateStatus("WARN: No mullion readings", true);
+					twitterAgent.updateStatus("WARN: No mullion temperature readings", true);
 					lastReadingAlarm = now;
 				}
 				continue;
 			}
-
-			// Update lowest temperature
-			low = (low == null || state.getTemperature() < low.getTemperature()) ? state : low;
-
-			// Get indoor dew point & calculate spread
-			float dewPoint = Dewpoint.calculate(climateControl.getLowestTemperature(), climateControl.getHighestHumidity());
+			float mullionTemperature = state.getTemperature();
+			
+			// Update mullion daily low
+			if (mullionDailyLow == null || mullionTemperature < mullionDailyLow.getTemperature()) {
+				mullionDailyLow = state;
+			}
+			
+			// Get indoor climate, calculate dew point & spread
+			float indoorTemperature = climateControl.getLowestTemperature();
+			int indoorHumidity = climateControl.getHighestHumidity();
+			float dewPoint = Dewpoint.calculate(indoorTemperature, indoorHumidity);
 			float spread = state.getTemperature()-dewPoint;
 
-			NumberFormat nf = NumberFormat.getNumberInstance();
-			nf.setMinimumFractionDigits(1);
-			nf.setMaximumFractionDigits(1);
-			
 			// Get a set of all the thermostats
 			Set<Thermostat> thermostats = climateControl.getThermostats();
 			if (thermostats.size() < 1) {
 				continue;
 			}
+			
 			// Get the set points from the first thermostat (should all be the same)
 			Thermostat firstThermostat = thermostats.iterator().next();
 			float heatingSetPoint = firstThermostat.getRuntime().getDesiredHeat();
 			float coolingSetPoint = firstThermostat.getRuntime().getDesiredCool();
-			
-			// Get indoor climate
-			float indoorTemperature = firstThermostat.getRuntime().getTemperature();
-			float indoorHumidity = firstThermostat.getRuntime().getHumidity();
-			
-			// Get mullion temperature
-			float mullionTemperature = state.getTemperature();
-			
+
 			// Log climate hourly
 			if (lastHourlyLog < now-ONE_HOUR && firstThermostat.getWeather() != null) {
-				WeatherForecast[] forecasts = firstThermostat.getWeather().getForecasts();
-				if (forecasts.length > 0) {
-					logger.info("Outside: temperature="+Math.round(forecasts[0].getTemperature()/10f)
-						+", humidity="+forecasts[0].getHumidity()+"%");
+				Weather weather = firstThermostat.getWeather();
+				if (weather != null) {
+					logger.info("Outside: temperature="+Math.round(weather.getTemperature())
+						+", humidity="+weather.getRelativeHumidity()+"%");
 				}
 				logger.info("Inside: temperature="+Math.round(indoorTemperature)
 					+", humidity="+Math.round(indoorHumidity)+"%");
@@ -139,18 +143,19 @@ public class MullionWatcher {
 			// At 8am, tweet daily low (with at least 5 hours of info)
 			if (cal.get(Calendar.HOUR_OF_DAY) == 8 && lastDailyLowTweet < now-5*ONE_HOUR) {
 				DateFormat df = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT);
-				String message = "24hr low was "+nf.format(low.getTemperature())
-					+" ("+low.getSensorName()+" @ "+df.format(new Date(low.getTimestamp()))
+				String message = "24hr low was "+nf.format(mullionDailyLow.getTemperature())
+					+" ("+mullionDailyLow.getSensorName()+" @ "+df.format(new Date(mullionDailyLow.getTimestamp()))
 					+") of "+mullionState.getSensorCount()+" sensors";
 				logger.info(message);
 				twitterAgent.updateStatus(message, false);
+				mullionDailyLow = null; // Clear the daily low
 				lastDailyLowTweet = now;
 			}
 
 			// Act when condensation is imminent
-			if (spread < ACTION_SPREAD && lastAction < now-0.25*ONE_HOUR && indoorTemperature <= heatingSetPoint) {
+			if (spread <= ACTION_SPREAD && lastAction < now-0.25*ONE_HOUR && indoorTemperature <= heatingSetPoint) {
 				try {
-					float desiredHeatTemp = heatingSetPoint+(spread-ALARM_SPREAD); // Accelerates as condition worsens
+					float desiredHeatTemp = heatingSetPoint+(spread-(ALARM_SPREAD+1)); // Accelerates as condition worsens
 					desiredHeatTemp = desiredHeatTemp >= 65f ? desiredHeatTemp : 65f; // No lower than 65F
 					if ((int)desiredHeatTemp < (int)heatingSetPoint) {
 						lastAction = now;
@@ -168,7 +173,7 @@ public class MullionWatcher {
 			
 			// Alarm when nearing dew point
 			// or tweet temp hourly when within watch spread
-			if (spread < ALARM_SPREAD && lastAlarmTweet < now-ONE_HOUR) {
+			if (spread <= ALARM_SPREAD && lastAlarmTweet < now-ONE_HOUR) {
 				String message = "CONDENSATION ALARM: Mullions at "+nf.format(state.getTemperature())
 					+" (spread="+nf.format(spread)+")";
 				logger.info(message);
@@ -232,6 +237,7 @@ public class MullionWatcher {
 		}
 		
 		// Start Ecobee climate thread
+		// TODO Load the appropriate climate control based on MullionWatcher properties
 		try {
 			Control ecobeeControl = Control.getInstance();
 			ecobeeControl.setDaemon(true);
@@ -239,7 +245,7 @@ public class MullionWatcher {
 			mw.climateControl = ecobeeControl;
 		} catch (Exception e) {
 			logger.fatal("Unable to start Ecobee climate control thread", e);
-			return;
+			System.exit(1);
 		}
 		
 		// Main loop

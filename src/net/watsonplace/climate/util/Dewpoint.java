@@ -14,7 +14,7 @@
  * You should have received a copy of the GNU General Public License
  * along with MullionWatcher.  If not, see <http://www.gnu.org/licenses/>.
  */
-package net.watsonplace.climate;
+package net.watsonplace.climate.util;
 
 public class Dewpoint {
 	
