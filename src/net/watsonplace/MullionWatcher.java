@@ -22,9 +22,9 @@ import java.net.SocketException;
 import java.text.DateFormat;
 import java.text.NumberFormat;
 import java.util.Calendar;
+import java.util.Collection;
 import java.util.Date;
 import java.util.Properties;
-import java.util.Set;
 
 import net.watsonplace.climate.ClimateControl;
 import net.watsonplace.climate.Thermostat;
@@ -93,32 +93,33 @@ public class MullionWatcher {
 			} catch (InterruptedException e) {}
 			
 			// Get current mullion temperature
-			TemperatureSample state = mullionState.getTemperature();
-			if (state == null) {
+			TemperatureSample mullionTemp = mullionState.getTemperature();
+			if (mullionTemp == null) {
 				if (lastReadingAlarm < now-ONE_HOUR) {
 					twitterAgent.updateStatus("WARN: No mullion temperature readings", true);
 					lastReadingAlarm = now;
 				}
 				continue;
 			}
-			float mullionTemperature = state.getTemperature();
 			
 			// Update mullion daily low
-			if (mullionDailyLow == null || mullionTemperature < mullionDailyLow.getTemperature()) {
-				mullionDailyLow = state;
+			if (mullionDailyLow == null) {
+				mullionDailyLow = mullionTemp;
+			} else {
+				float dailyLowTemp = mullionDailyLow.getTemperature();
+				mullionDailyLow = mullionTemp.getTemperature() < dailyLowTemp ? mullionTemp : mullionDailyLow;
 			}
 			
 			// Get indoor climate, calculate dew point & spread
 			float indoorTemperature = climateControl.getLowestTemperature();
 			int indoorHumidity = climateControl.getHighestHumidity();
 			float dewPoint = Dewpoint.calculate(indoorTemperature, indoorHumidity);
-			float spread = state.getTemperature()-dewPoint;
+			float spread = mullionTemp.getTemperature()-dewPoint;
 
 			// Get a set of all the thermostats
-			Set<Thermostat> thermostats = climateControl.getThermostats();
-			if (thermostats.size() < 1) {
-				continue;
-			}
+			Collection<Thermostat> thermostats = climateControl.getThermostats();
+			if (thermostats == null) continue;
+			if (thermostats.size() < 1) continue;
 			
 			// Get the set points from the first thermostat (should all be the same)
 			Thermostat firstThermostat = thermostats.iterator().next();
@@ -134,7 +135,7 @@ public class MullionWatcher {
 				}
 				logger.info("Inside: temperature="+Math.round(indoorTemperature)
 					+", humidity="+Math.round(indoorHumidity)+"%");
-				logger.info("Mullions: temperature="+nf.format(mullionTemperature)
+				logger.info("Mullions: temperature="+nf.format(mullionTemp.getTemperature())
 					+", dew point="+nf.format(dewPoint));
 				logger.info("Thermostat: heating set point="+Math.round(heatingSetPoint));
 				lastHourlyLog = now;
@@ -174,13 +175,13 @@ public class MullionWatcher {
 			// Alarm when nearing dew point
 			// or tweet temp hourly when within watch spread
 			if (spread <= ALARM_SPREAD && lastAlarmTweet < now-ONE_HOUR) {
-				String message = "CONDENSATION ALARM: Mullions at "+nf.format(state.getTemperature())
+				String message = "CONDENSATION ALARM: Mullions at "+nf.format(mullionTemp.getTemperature())
 					+" (spread="+nf.format(spread)+")";
 				logger.info(message);
 				twitterAgent.updateStatus(message, true);
 				lastAlarmTweet = now;
 			} else if (spread <= TWEET_SPREAD && lastHourlyTweet < now-ONE_HOUR) {
-				String message = "CONDENSATION WATCH: mullions at "+ nf.format(state.getTemperature())
+				String message = "CONDENSATION WATCH: mullions at "+ nf.format(mullionTemp.getTemperature())
 					+" (spread="+nf.format(spread)+")";
 				logger.info(message);
 				twitterAgent.updateStatus(message, true);

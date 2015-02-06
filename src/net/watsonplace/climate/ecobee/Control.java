@@ -1,10 +1,13 @@
 package net.watsonplace.climate.ecobee;
 
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
 
 import net.watsonplace.climate.ClimateControl;
-import net.watsonplace.climate.Thermostat;
 import net.watsonplace.climate.Runtime;
+import net.watsonplace.climate.Thermostat;
 import net.watsonplace.climate.Weather;
 import net.watsonplace.ecobee.api.API;
 import net.watsonplace.ecobee.api.APIWrapper;
@@ -27,7 +30,7 @@ public class Control extends Thread implements ClimateControl {
 	private Set<net.watsonplace.ecobee.api.Thermostat> ecobeeThermostats;
 	
 	// Local
-	private Set<Thermostat> thermostats;
+	private Map<String, Thermostat> thermostatMap = new HashMap<String, Thermostat>();
 
 	// Climate state variables
 	private float temperature = Float.MAX_VALUE;
@@ -51,9 +54,12 @@ public class Control extends Thread implements ClimateControl {
 				// Fetch all Ecobee thermostats and populate the abstraction
 				ecobeeThermostats = api.getThermostats();
 				for (net.watsonplace.ecobee.api.Thermostat ecobeeThermostat : ecobeeThermostats) {
-					Thermostat thermostat = new Thermostat();
-					thermostat.setIdentifier(ecobeeThermostat.getIdentifier());
-					thermostat.setName(ecobeeThermostat.getName());
+					Thermostat thermostat = thermostatMap.get(ecobeeThermostat.getIdentifier());
+					if (thermostat == null) {
+						thermostat = new Thermostat();
+						thermostat.setIdentifier(ecobeeThermostat.getIdentifier());
+						thermostat.setName(ecobeeThermostat.getName());
+					}
 					thermostat.setThermostatTime(ecobeeThermostat.getThermostatTime());
 					thermostat.setUtcTime(ecobeeThermostat.getUtcTime());
 					// Populate the abstraction runtime from the Ecobee runtime
@@ -78,6 +84,11 @@ public class Control extends Thread implements ClimateControl {
 						weather.setWindSpeed(ecobeeForecasts[0].getWindSpeed());
 						weather.setWindDirection(ecobeeForecasts[0].getWindDirection());
 						thermostat.setWeather(weather);
+					}
+					
+					// Add it to the Set
+					if (!thermostatMap.containsKey(thermostat.getIdentifier())) {
+						thermostatMap.put(thermostat.getIdentifier(), thermostat);
 					}
 
 					// Find the extremes among all the thermostats
@@ -113,8 +124,8 @@ public class Control extends Thread implements ClimateControl {
 	}
 
 	@Override
-	public Set<Thermostat> getThermostats() {
-		return thermostats;
+	public Collection<Thermostat> getThermostats() {
+		return thermostatMap.values();
 	}
 
 	// Returns lowest temperature (worst case) among all thermostats

@@ -1,12 +1,10 @@
 package net.watsonplace.climate;
 
-import java.util.Set;
-
-import net.watsonplace.climate.Thermostat;
+import java.util.Collection;
 
 public interface ClimateControl {
 	
-	public Set<Thermostat> getThermostats();
+	public Collection<Thermostat> getThermostats();
 
 	public float getLowestTemperature();
 	

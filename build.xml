@@ -31,7 +31,7 @@
 	
 	<target name="compile" depends="resolve" description="compile the source ">
 		<!-- Compile the java code from ${src} into ${build} -->
-		<javac srcdir="${src}" destdir="${build}">
+		<javac srcdir="${src}" destdir="${build}" debug="on" debuglevel="lines,vars,source">
 			<classpath refid="classpath"/>
 		</javac>
 	</target>
