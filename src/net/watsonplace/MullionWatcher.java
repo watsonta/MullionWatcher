@@ -213,20 +213,35 @@ public class MullionWatcher {
 
 		MullionWatcher mw = new MullionWatcher();
 		
-		// Start mullion Receiver thread
-		logger.debug("Starting Receiver thread");
-		Receiver receiver = null;
-		try {
-			receiver = new Receiver(receiverPort);
-			receiver.setDaemon(true);
-			receiver.start();
-		} catch (SocketException e) {
-			logger.error(e);
-			System.exit(1);
+		if (receiverHost.equals("localhost")) {
+			// Start mullion Receiver thread
+			logger.info("Starting Receiver thread");
+			Receiver receiver = null;
+			try {
+				receiver = new Receiver(receiverPort);
+				receiver.setDaemon(true);
+				receiver.start();
+			} catch (SocketException e) {
+				logger.error(e);
+				System.exit(1);
+			}
+			
+			// Start Ecobee climate thread
+			// TODO Load the appropriate climate control based on MullionWatcher properties
+			logger.info("Starting Ecobee Climate Control thread");
+			try {
+				Control ecobeeControl = Control.getInstance();
+				ecobeeControl.setDaemon(true);
+				ecobeeControl.start();
+				mw.climateControl = ecobeeControl;
+			} catch (Exception e) {
+				logger.fatal("Unable to start Ecobee climate control thread", e);
+				System.exit(1);
+			}
 		}
 		
 		// Start mullion Broadcaster thread
-		logger.debug("Starting Broadcaster thread");
+		logger.info("Starting Broadcaster thread");
 		Sender broadcaster = null;
 		try {
 			broadcaster = new Sender(receiverHost, receiverPort);
@@ -234,18 +249,6 @@ public class MullionWatcher {
 			broadcaster.start();
 		} catch (Exception e) {
 			logger.error(e);
-			System.exit(1);
-		}
-		
-		// Start Ecobee climate thread
-		// TODO Load the appropriate climate control based on MullionWatcher properties
-		try {
-			Control ecobeeControl = Control.getInstance();
-			ecobeeControl.setDaemon(true);
-			ecobeeControl.start();
-			mw.climateControl = ecobeeControl;
-		} catch (Exception e) {
-			logger.fatal("Unable to start Ecobee climate control thread", e);
 			System.exit(1);
 		}
 		
