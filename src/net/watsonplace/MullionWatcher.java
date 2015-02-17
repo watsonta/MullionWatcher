@@ -42,13 +42,19 @@ import org.apache.log4j.Logger;
 public class MullionWatcher {
 	private static final Logger logger = Logger.getLogger(MullionWatcher.class.getName());
 
+	private static enum ActionState { normal, watch, alarm, action }
+	
 	private static final String MULLIONWATCHER_PROPERTIES_FILE = "conf/MullionWatcher.properties";
 	private static final long ONE_MINUTE = 60*1000;
 	private static final long ONE_HOUR = 60*ONE_MINUTE;
-	private static final int TWEET_SPREAD = 5;
-	private static final int ALARM_SPREAD = 2;
-	private static final int ACTION_SPREAD = 1;
-	
+	private static final int WATCH_SPREAD = 5;
+	private static final int ALARM_SPREAD = 3;
+	private static final int ACTION_SPREAD = 2;
+	private static final int RECOVERY_SPREAD = 4;
+	private static final int HOLD_HOURS = 4;
+
+	private static boolean SENDER_ONLY = false;
+	private static int MINIMUM_TEMPERATURE = 65;
 	private static boolean shutdown = false;
 	
 	private ClimateControl climateControl;
@@ -60,11 +66,14 @@ public class MullionWatcher {
 	 */
 	public void run() {
 		long lastReadingAlarm = System.currentTimeMillis();
-		long lastAlarmTweet = 0;
+		long lastWatchNotification = 0;
+		long lastAlarmNotification = 0;
 		long lastHourlyLog = 0;
-		long lastHourlyTweet = 0;
 		long lastDailyLowTweet = System.currentTimeMillis();
 		long lastAction = 0;
+		boolean actionMessage = false;
+		
+		ActionState actionState = ActionState.normal;
 		
 		TemperatureSample mullionDailyLow = null;
 		
@@ -77,7 +86,10 @@ public class MullionWatcher {
 		MullionState mullionState = MullionState.getInstance();
 		
 		// Get the TwitterAgent instance
-		Agent twitterAgent = Agent.getInstance();
+		Agent twitterAgent = null;
+		if (!SENDER_ONLY) {
+			twitterAgent = Agent.getInstance();
+		}
 		
 		// Get a calendar instance for no reason other than so that we can know when it's 8am
 		Calendar cal = Calendar.getInstance();
@@ -87,11 +99,14 @@ public class MullionWatcher {
 			long now = System.currentTimeMillis();
 			cal.setTimeInMillis(now);
 
-			// Let's check things every minute
+			// Let's check things every five minutes
 			try {
-				Thread.sleep(ONE_MINUTE);
+				Thread.sleep(5*ONE_MINUTE);
 			} catch (InterruptedException e) {}
-			
+
+			// If we're just a sender, then short circuit
+			if (SENDER_ONLY) continue;
+		
 			// Get current mullion temperature
 			TemperatureSample mullionTemp = mullionState.getTemperature();
 			if (mullionTemp == null) {
@@ -118,8 +133,15 @@ public class MullionWatcher {
 
 			// Get a set of all the thermostats
 			Collection<Thermostat> thermostats = climateControl.getThermostats();
-			if (thermostats == null) continue;
-			if (thermostats.size() < 1) continue;
+			if (!((thermostats != null) && (thermostats.size() >= 1))) {
+				if (lastAlarmNotification < now-ONE_HOUR) {
+					String message = "Climate control did not return any thermostats!";
+					logger.error(message);
+					twitterAgent.updateStatus(message, true);
+					lastAlarmNotification = now;
+				}
+				continue;
+			}
 			
 			// Get the set points from the first thermostat (should all be the same)
 			Thermostat firstThermostat = thermostats.iterator().next();
@@ -127,21 +149,25 @@ public class MullionWatcher {
 			float coolingSetPoint = firstThermostat.getRuntime().getDesiredCool();
 
 			// Log climate hourly
-			if (lastHourlyLog < now-ONE_HOUR && firstThermostat.getWeather() != null) {
-				Weather weather = firstThermostat.getWeather();
-				if (weather != null) {
-					logger.info("Outside: temperature="+Math.round(weather.getTemperature())
-						+", humidity="+weather.getRelativeHumidity()+"%");
+			if (lastHourlyLog < now-ONE_HOUR) {
+				if (firstThermostat.getWeather() != null) {
+					Weather weather = firstThermostat.getWeather();
+					if (weather != null) {
+						logger.info("Outside: temperature="+Math.round(weather.getTemperature())
+							+", humidity="+weather.getRelativeHumidity()+"%");
+					}
+					logger.info("Inside: temperature="+Math.round(indoorTemperature)
+						+", humidity="+Math.round(indoorHumidity)+"%");
+					logger.info("Mullions: temperature="+nf.format(mullionTemp.getTemperature())
+						+", dew point="+nf.format(dewPoint));
+					logger.info("Thermostat: heating set point="+Math.round(heatingSetPoint));
+				} else {
+					logger.info("Climate control did not provide any weather information");
 				}
-				logger.info("Inside: temperature="+Math.round(indoorTemperature)
-					+", humidity="+Math.round(indoorHumidity)+"%");
-				logger.info("Mullions: temperature="+nf.format(mullionTemp.getTemperature())
-					+", dew point="+nf.format(dewPoint));
-				logger.info("Thermostat: heating set point="+Math.round(heatingSetPoint));
 				lastHourlyLog = now;
 			}
 			
-			// At 8am, tweet daily low (with at least 5 hours of info)
+			// At 8am, tweet the daily low (with at least 5 hours of info)
 			if (cal.get(Calendar.HOUR_OF_DAY) == 8 && lastDailyLowTweet < now-5*ONE_HOUR) {
 				DateFormat df = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT);
 				String message = "24hr low was "+nf.format(mullionDailyLow.getTemperature())
@@ -152,42 +178,94 @@ public class MullionWatcher {
 				mullionDailyLow = null; // Clear the daily low
 				lastDailyLowTweet = now;
 			}
+			
+			String mullionTempMessage = "Mullions at "+ nf.format(mullionTemp.getTemperature())
+				+" (spread="+nf.format(spread)+")";
 
+			// Update action state
+			switch (actionState) {
+			case normal:
+				if (spread < WATCH_SPREAD) {
+					actionState = ActionState.watch;
+					logger.info("ActionState changed to "+actionState);
+				}
+			case watch:
+				if (spread < ALARM_SPREAD) {
+					actionState = ActionState.alarm;
+					logger.info("ActionState changed to "+actionState);
+				}
+			case alarm:
+				if (spread < ACTION_SPREAD) {
+					actionState = ActionState.action;
+					logger.info("ActionState changed to "+actionState);
+					actionMessage = true; // only put one message on thermostat per action event
+				}
+				break;
+			case action:
+				if (spread > RECOVERY_SPREAD) {
+					actionState = ActionState.normal;
+					logger.info("ActionState changed to "+actionState);
+					actionMessage = false;
+					String message = "CONDENSATION RECOVERY: "+mullionTempMessage;
+					logger.info(message);
+					twitterAgent.updateStatus(message, true);
+				}
+			}
+
+			// Notify when within watch spread
+			if (actionState == ActionState.watch) {
+				if (lastWatchNotification < now-ONE_HOUR) {
+					String message = "CONDENSATION WATCH: "+mullionTempMessage;
+					logger.info(message);
+					twitterAgent.updateStatus(message, true);
+					lastWatchNotification = now;
+				}
+			}
+
+			// Notify when nearing dew point
+			if (actionState == ActionState.alarm) {
+				if (lastAlarmNotification < now-ONE_HOUR) {
+					String message = "CONDENSATION ALARM: "+mullionTempMessage;
+					logger.info(message);
+					twitterAgent.updateStatus(message, true);
+					lastAlarmNotification = now;
+				}
+			}
+			
 			// Act when condensation is imminent
-			if (spread <= ACTION_SPREAD && lastAction < now-0.25*ONE_HOUR && indoorTemperature <= heatingSetPoint) {
+			if (actionState == ActionState.action) {
 				try {
-					float desiredHeatTemp = heatingSetPoint+(spread-(ALARM_SPREAD+1)); // Accelerates as condition worsens
-					desiredHeatTemp = desiredHeatTemp >= 65f ? desiredHeatTemp : 65f; // No lower than 65F
-					if ((int)desiredHeatTemp < (int)heatingSetPoint) {
+					// Calculate desired heating set point
+					// Algorithm accelerates as spread worsens
+					float desiredHeatTemp = heatingSetPoint+(spread-(ALARM_SPREAD+1));
+					// Go no lower than MINIMUM_TEMPERATURE
+					desiredHeatTemp = desiredHeatTemp >= MINIMUM_TEMPERATURE ? desiredHeatTemp : MINIMUM_TEMPERATURE;
+
+					// Change set point only downward
+					boolean setHold = (int)desiredHeatTemp < (int)heatingSetPoint;
+					// Refresh one minute before it expires
+					setHold |= lastAction < now - (HOLD_HOURS * ONE_HOUR) + ONE_MINUTE;
+					// Don't set more frequently than every 15 minutes
+					setHold &= lastAction < now - 15 * ONE_MINUTE;
+
+					// Set the hold
+					// NOTE: At the end of each hold period, the heating set point can drift upward
+					if (setHold) {
+						climateControl.setHold((int)desiredHeatTemp, Math.round(coolingSetPoint), HOLD_HOURS, actionMessage);
 						lastAction = now;
-						climateControl.setHold((int)desiredHeatTemp, Math.round(coolingSetPoint), 4); // 4 hour hold
-						String message = "ACTION: Changed thermostat heat set point to "+desiredHeatTemp;
+						// Log the action
+						String message = "ACTION: Changed thermostat heat set point to "+(int)desiredHeatTemp;
 						logger.info(message);
+						// Tweet it
 						twitterAgent.updateStatus(message, true);
 					}
 				} catch (Exception e) {
-					String message = "Unable to set thermostat heat set point";
+					String message = "Unable to set heating set point";
 					logger.error(message, e);
 					twitterAgent.updateStatus("FAIL: "+message, true);
 				}
 			}
 			
-			// Alarm when nearing dew point
-			// or tweet temp hourly when within watch spread
-			if (spread <= ALARM_SPREAD && lastAlarmTweet < now-ONE_HOUR) {
-				String message = "CONDENSATION ALARM: Mullions at "+nf.format(mullionTemp.getTemperature())
-					+" (spread="+nf.format(spread)+")";
-				logger.info(message);
-				twitterAgent.updateStatus(message, true);
-				lastAlarmTweet = now;
-			} else if (spread <= TWEET_SPREAD && lastHourlyTweet < now-ONE_HOUR) {
-				String message = "CONDENSATION WATCH: mullions at "+ nf.format(mullionTemp.getTemperature())
-					+" (spread="+nf.format(spread)+")";
-				logger.info(message);
-				twitterAgent.updateStatus(message, true);
-				lastHourlyTweet = now;
-			}
-				
 		}
 	}
 
@@ -206,14 +284,19 @@ public class MullionWatcher {
 				props.load(new FileInputStream(file));
 				receiverHost = props.getProperty("sender.receive_host");
 				receiverPort = Integer.parseInt(props.getProperty("sender.receive_port"));
+				MINIMUM_TEMPERATURE = Integer.parseInt(props.getProperty("minimum.temperature"));
 			}
 		} catch (Exception e) {
-			logger.fatal("Unable to load MullionWatcher properties", e);
+			logger.error("Unable to load MullionWatcher properties", e);
+		}
+		
+		if (!receiverHost.startsWith("localhost")) {
+			SENDER_ONLY = true;
 		}
 
 		MullionWatcher mw = new MullionWatcher();
 		
-		if (receiverHost.equals("localhost")) {
+		if (!SENDER_ONLY) {
 			// Start mullion Receiver thread
 			logger.info("Starting Receiver thread");
 			Receiver receiver = null;

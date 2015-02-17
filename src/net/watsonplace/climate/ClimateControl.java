@@ -12,6 +12,6 @@ public interface ClimateControl {
 	
 	public long getSampleTimestamp();
 	
-	public void setHold(int desiredHeatTemp, int desiredColdTemp, int hours) throws Exception;
+	public void setHold(int desiredHeatTemp, int desiredColdTemp, int hours, boolean message) throws Exception;
 	
 }

@@ -106,7 +106,7 @@ public class Agent {
 		}
 
 		// Tweet
-		logger.info("Tweeting: #MullionWatcher "+tweetBody);
+		logger.info("Tweeting: "+tweet);
 		try {
 			twitter.updateStatus(tweet.toString());
 		} catch (TwitterException e) {

@@ -1,5 +1,5 @@
 <project name="MullionWatcher" default="jar" basedir="." xmlns:ivy="antlib:org.apache.ivy.ant">
-	<property name="revision" value="0.36" />
+	<property name="revision" value="0.38" />
 	
 	<!-- set global properties for this build -->
 	<property name="src" location="src"/>
