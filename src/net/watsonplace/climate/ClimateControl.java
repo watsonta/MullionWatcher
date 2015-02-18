@@ -14,4 +14,6 @@ public interface ClimateControl {
 	
 	public void setHold(int desiredHeatTemp, int desiredColdTemp, int hours, boolean message) throws Exception;
 	
+	public void releaseHold() throws Exception;
+	
 }
