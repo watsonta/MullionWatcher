@@ -11,6 +11,6 @@
 	<classpathentry kind="lib" path="lib/junit-4.5.jar"/>
 	<classpathentry kind="lib" path="lib/log4j-1.2.15.jar"/>
 	<classpathentry kind="lib" path="lib/gson-2.3.1.jar"/>
-	<classpathentry combineaccessrules="false" kind="src" path="/EcobeeAPIWrapper"/>
+	<classpathentry kind="lib" path="lib/EcobeeAPIWrapper-0.13.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

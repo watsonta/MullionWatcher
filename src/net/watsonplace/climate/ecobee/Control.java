@@ -146,16 +146,16 @@ public class Control extends Thread implements ClimateControl {
 	}
 
 	@Override
-	public void setHold(int desiredHeatTemp, int desiredColdTemp, int hours, boolean message) throws Exception {
-		api.setHold(desiredHeatTemp, desiredColdTemp, hours);
-//		if (message) {
-//			api.sendMessage("Condensation ALERT");
-//		}
+	public void setHold(String[] identifiers, int desiredHeatTemp, int desiredColdTemp, int hours, boolean message) throws Exception {
+		api.setHold(identifiers, desiredHeatTemp, desiredColdTemp, hours);
+		if (message) {
+			api.sendMessage(identifiers, "Condensation ALERT");
+		}
 	}
 	
 	@Override
-	public void releaseHold() throws Exception {
-		api.releaseHold();
+	public void releaseHold(String [] identifiers) throws Exception {
+		api.releaseHold(identifiers);
 	}
 
 }
